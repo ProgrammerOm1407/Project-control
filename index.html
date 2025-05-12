@@ -3,6 +3,9 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+<!-- Prevent touch delay on mobile devices -->
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
 <title>Laptop Remote Control</title>
 <style>
   body {
@@ -161,12 +164,20 @@
     <button id="send-key">Send</button>
   </div>
 
+  <div class="buttons-row">
+    <button id="toggle-touchpad" title="Toggle Touchpad Mode">Touchpad Mode</button>
+  </div>
+  
+  <div id="touchpad-area" style="display:none; height:200px; background:#333; border-radius:8px; margin:10px 0; position:relative;">
+    <div style="text-align:center; padding-top:90px; color:#999;">Touch and drag to move mouse</div>
+  </div>
+  
   <div class="instruction">
     Use arrow buttons to move mouse pointer.<br/>
     Click buttons to left/right click.<br/>
     Type keys and press Send.<br/>
     Scroll buttons scroll vertically.<br/>
-    Mobile optimized control UI.
+    Try Touchpad Mode for direct control.
   </div>
 </div>
 
@@ -183,8 +194,9 @@
   let ws = null;
   let authenticated = false;
   let debugMode = false;
-  const MOVE_STEP = 25; // mouse move step in pixels
-  const SCROLL_STEP = 50; // scroll step amount
+  const MOVE_STEP = 40; // increased mouse move step for faster movement
+  const SCROLL_STEP = 80; // increased scroll step amount
+  const MOVE_INTERVAL = 80; // ms between mouse move commands (lower = faster but more network traffic)
 
   function setStatus(text, color = '#eee') {
     statusEl.textContent = text;
@@ -316,7 +328,7 @@
         const { dx, dy } = mouseButtons[activeMouseButton];
         sendCommand({ type: 'mouseMove', dx, dy });
       }
-    }, 150); // Send command every 150ms for smooth movement
+    }, MOVE_INTERVAL); // Use configurable interval for better control
   }
   
   function stopMouseMovement() {
@@ -403,7 +415,7 @@
     // Set up interval for continuous scrolling
     scrollInterval = setInterval(() => {
       sendCommand({ type: 'scroll', dy: direction * SCROLL_STEP });
-    }, 200); // Scroll every 200ms
+    }, 100); // Faster scrolling (100ms)
   }
   
   function stopScrolling() {
@@ -499,6 +511,65 @@
       loginBtn.click();
     }
   });
+  
+  // Touchpad mode implementation
+  const touchpadToggle = document.getElementById('toggle-touchpad');
+  const touchpadArea = document.getElementById('touchpad-area');
+  let touchpadMode = false;
+  let lastTouchX = 0;
+  let lastTouchY = 0;
+  
+  touchpadToggle.addEventListener('click', () => {
+    touchpadMode = !touchpadMode;
+    touchpadArea.style.display = touchpadMode ? 'block' : 'none';
+    touchpadToggle.style.backgroundColor = touchpadMode ? '#4caf50' : '#333';
+    touchpadToggle.textContent = touchpadMode ? 'Exit Touchpad Mode' : 'Touchpad Mode';
+  });
+  
+  // Direct touchpad control
+  touchpadArea.addEventListener('touchstart', (e) => {
+    e.preventDefault();
+    const touch = e.touches[0];
+    lastTouchX = touch.clientX;
+    lastTouchY = touch.clientY;
+  });
+  
+  touchpadArea.addEventListener('touchmove', (e) => {
+    e.preventDefault();
+    const touch = e.touches[0];
+    const dx = touch.clientX - lastTouchX;
+    const dy = touch.clientY - lastTouchY;
+    
+    if (dx !== 0 || dy !== 0) {
+      sendCommand({ type: 'mouseMove', dx: dx * 1.5, dy: dy * 1.5 });
+      lastTouchX = touch.clientX;
+      lastTouchY = touch.clientY;
+    }
+  });
+  
+  // Double tap for left click
+  let lastTap = 0;
+  touchpadArea.addEventListener('touchend', (e) => {
+    const now = Date.now();
+    const timeDiff = now - lastTap;
+    
+    if (timeDiff < 300 && timeDiff > 0) {
+      // Double tap detected
+      sendCommand({ type: 'mouseClick', button: 'left' });
+    }
+    
+    lastTap = now;
+  });
+  
+  // Auto-connect on mobile
+  if (/Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)) {
+    passwordInput.value = '123'; // Default password for mobile
+    window.addEventListener('load', () => {
+      setTimeout(() => {
+        loginBtn.click();
+      }, 500);
+    });
+  }
 })();
 </script>
 

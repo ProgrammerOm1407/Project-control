@@ -9,14 +9,14 @@ const app = express();
 const server = http.createServer(app);
 const wss = new WebSocket.Server({ server });
 
-const PORT = 3003;
+const PORT = 3001;
 
 // Serve static files if they exist
 app.use(express.static(path.join(__dirname, 'public')));
 
 // Serve the client HTML file
 app.get('/', (req, res) => {
-  res.sendFile(path.join(__dirname, 'client.html'));
+  res.sendFile(path.join(__dirname, 'index.html'));
 });
 
 // Basic authentication password (change as you want)
