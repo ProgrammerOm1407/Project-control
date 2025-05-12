@@ -1,0 +1,507 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+<title>Laptop Remote Control</title>
+<style>
+  body {
+    margin: 0;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    background: #121212;
+    color: #eee;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: flex-start;
+    min-height: 600px;
+    max-width: 350px;
+    margin-left: auto;
+    margin-right: auto;
+    padding: 10px;
+    box-sizing: border-box;
+  }
+  h1 {
+    margin-bottom: 5px;
+    font-weight: 700;
+    color: #4caf50;
+  }
+  .status {
+    margin-bottom: 10px;
+    font-size: 0.9rem;
+    height: 20px;
+  }
+  #login-section, #control-section {
+    width: 100%;
+    max-width: 350px;
+    background: #222;
+    border-radius: 12px;
+    padding: 15px;
+    box-sizing: border-box;
+    box-shadow: 0 5px 15px rgba(0,0,0,0.6);
+  }
+  #login-section input {
+    width: 100%;
+    padding: 12px 10px;
+    border-radius: 8px;
+    border: none;
+    font-size: 1rem;
+    margin-bottom: 10px;
+    box-sizing: border-box;
+  }
+  #login-section button {
+    width: 100%;
+    padding: 12px;
+    border: none;
+    border-radius: 8px;
+    background: #4caf50;
+    color: #fff;
+    font-weight: 600;
+    font-size: 1rem;
+    cursor: pointer;
+    transition: background-color 0.3s ease;
+  }
+  #login-section button:hover {
+    background: #45a049;
+  }
+  .buttons-row {
+    display: flex;
+    justify-content: center;
+    margin: 10px 0;
+  }
+  .buttons-row button {
+    flex: 1;
+    margin: 0 6px;
+    padding: 15px 0;
+    background: #333;
+    color: #eee;
+    font-size: 1.1rem;
+    border: none;
+    border-radius: 8px;
+    box-shadow: 0 3px 8px rgba(0,0,0,0.5);
+    cursor: pointer;
+    transition: background-color 0.3s ease;
+    user-select: none;
+  }
+  .buttons-row button:hover {
+    background: #4caf50;
+    color: #fff;
+  }
+  #keyboard-container {
+    margin: 15px 0;
+    display: flex;
+  }
+  #key-input {
+    flex: 1;
+    padding: 12px 10px;
+    border-radius: 8px 0 0 8px;
+    border: none;
+    font-size: 1.1rem;
+    box-sizing: border-box;
+  }
+  #send-key {
+    padding: 12px 20px;
+    border: none;
+    border-radius: 0 8px 8px 0;
+    background: #4caf50;
+    color: #fff;
+    font-weight: 600;
+    font-size: 1.1rem;
+    cursor: pointer;
+    box-shadow: 0 3px 8px rgba(0,0,0,0.5);
+    transition: background-color 0.3s ease;
+    user-select: none;
+  }
+  #send-key:hover {
+    background: #45a049;
+  }
+  .instruction {
+    font-size: 0.85rem;
+    color: #bbb;
+    margin-top: 10px;
+    text-align: center;
+  }
+</style>
+</head>
+<body>
+
+<h1>Laptop Remote Control</h1>
+<div class="status" id="status">Disconnected</div>
+<div id="debug-status" style="font-size: 0.8rem; color: #999; margin-bottom: 10px; height: 60px; overflow-y: auto;"></div>
+
+<div id="login-section">
+  <input type="password" id="password" placeholder="Enter password" autocomplete="off" />
+  <button id="login-btn">Connect</button>
+  <div style="margin-top: 10px; display: flex; align-items: center;">
+    <input type="checkbox" id="debug-mode" style="margin-right: 5px;">
+    <label for="debug-mode" style="font-size: 0.8rem; color: #999;">Debug Mode</label>
+  </div>
+</div>
+
+<div id="control-section" style="display:none;">
+  <div class="buttons-row" style="justify-content:center;">
+    <button id="mouse-up" title="Move Mouse Up">⬆️</button>
+  </div>
+  <div class="buttons-row">
+    <button id="mouse-left" title="Move Mouse Left">⬅️</button>
+    <button id="mouse-down" title="Move Mouse Down">⬇️</button>
+    <button id="mouse-right" title="Move Mouse Right">➡️</button>
+  </div>
+  <div class="buttons-row">
+    <button id="left-click" title="Left Click">Left Click</button>
+    <button id="right-click" title="Right Click">Right Click</button>
+  </div>
+  <div class="buttons-row">
+    <button id="scroll-up" title="Scroll Up">Scroll Up ⬆️</button>
+    <button id="scroll-down" title="Scroll Down">Scroll Down ⬇️</button>
+  </div>
+
+  <div id="keyboard-container">
+    <input type="text" id="key-input" placeholder="Type a key (e.g., a, enter, space)" autocomplete="off" />
+    <button id="send-key">Send</button>
+  </div>
+
+  <div class="instruction">
+    Use arrow buttons to move mouse pointer.<br/>
+    Click buttons to left/right click.<br/>
+    Type keys and press Send.<br/>
+    Scroll buttons scroll vertically.<br/>
+    Mobile optimized control UI.
+  </div>
+</div>
+
+<script>
+(() => {
+  const statusEl = document.getElementById('status');
+  const debugStatusEl = document.getElementById('debug-status');
+  const loginSection = document.getElementById('login-section');
+  const controlSection = document.getElementById('control-section');
+  const passwordInput = document.getElementById('password');
+  const loginBtn = document.getElementById('login-btn');
+  const debugModeCheckbox = document.getElementById('debug-mode');
+
+  let ws = null;
+  let authenticated = false;
+  let debugMode = false;
+  const MOVE_STEP = 25; // mouse move step in pixels
+  const SCROLL_STEP = 50; // scroll step amount
+
+  function setStatus(text, color = '#eee') {
+    statusEl.textContent = text;
+    statusEl.style.color = color;
+  }
+  
+  function logDebug(message) {
+    if (debugMode) {
+      const timestamp = new Date().toLocaleTimeString();
+      const logEntry = document.createElement('div');
+      logEntry.textContent = `${timestamp}: ${message}`;
+      debugStatusEl.appendChild(logEntry);
+      debugStatusEl.scrollTop = debugStatusEl.scrollHeight;
+      
+      // Keep only the last 10 messages
+      while (debugStatusEl.childNodes.length > 10) {
+        debugStatusEl.removeChild(debugStatusEl.firstChild);
+      }
+    }
+  }
+  
+  // Toggle debug mode
+  debugModeCheckbox.addEventListener('change', () => {
+    debugMode = debugModeCheckbox.checked;
+    if (debugMode) {
+      debugStatusEl.style.display = 'block';
+      logDebug('Debug mode enabled');
+    } else {
+      debugStatusEl.style.display = 'none';
+    }
+  });
+
+  function createWebSocket(password) {
+    const proto = location.protocol === 'https:' ? 'wss' : 'ws';
+    const wsUrl = proto + '://' + location.host;
+    ws = new WebSocket(wsUrl);
+
+    ws.onopen = () => {
+      setStatus('Connected. Authenticating...', '#4caf50');
+      ws.send(JSON.stringify({ type: 'auth', password }));
+    };
+
+    ws.onmessage = (event) => {
+      try {
+        const data = JSON.parse(event.data);
+        logDebug(`Received message: ${JSON.stringify(data)}`);
+        
+        if (data.type === 'auth') {
+          if (data.success) {
+            authenticated = true;
+            setStatus('Authenticated. Ready to control.', '#4caf50');
+            loginSection.style.display = 'none';
+            controlSection.style.display = 'block';
+            
+            // Request screen info immediately after authentication
+            sendCommand({ type: 'getScreenInfo' });
+          } else {
+            setStatus('Authentication Failed. Please try again.', '#f44336');
+            logDebug('Authentication failed');
+            ws.close();
+          }
+        } else if (data.type === 'screenInfo') {
+          logDebug(`Screen size: ${data.width}x${data.height}`);
+        } else if (data.type === 'error') {
+          logDebug(`Server error: ${data.message}`);
+        }
+      } catch (e) {
+        console.error('Failed to parse message', e);
+        logDebug(`Failed to parse message: ${e.message}`);
+      }
+    };
+
+    ws.onclose = () => {
+      setStatus('Disconnected', '#eee');
+      authenticated = false;
+      loginSection.style.display = 'block';
+      controlSection.style.display = 'none';
+    };
+
+    ws.onerror = () => {
+      setStatus('WebSocket error', '#f44336');
+    };
+  }
+
+  // Send command helper
+  function sendCommand(data) {
+    if (ws && ws.readyState === WebSocket.OPEN && authenticated) {
+      logDebug(`Sending command: ${JSON.stringify(data)}`);
+      ws.send(JSON.stringify(data));
+      return true;
+    } else {
+      if (!ws) {
+        logDebug('Error: WebSocket not initialized');
+      } else if (ws.readyState !== WebSocket.OPEN) {
+        logDebug(`Error: WebSocket not open (state: ${ws.readyState})`);
+      } else if (!authenticated) {
+        logDebug('Error: Not authenticated');
+      }
+      return false;
+    }
+  }
+
+  // Mouse movement handlers with continuous movement
+  const mouseButtons = {
+    'mouse-up': { dx: 0, dy: -MOVE_STEP },
+    'mouse-down': { dx: 0, dy: MOVE_STEP },
+    'mouse-left': { dx: -MOVE_STEP, dy: 0 },
+    'mouse-right': { dx: MOVE_STEP, dy: 0 }
+  };
+  
+  let activeMouseButton = null;
+  let mouseInterval = null;
+  
+  // Function to handle mouse movement
+  function startMouseMovement(buttonId) {
+    if (mouseInterval) {
+      clearInterval(mouseInterval);
+    }
+    
+    activeMouseButton = buttonId;
+    const { dx, dy } = mouseButtons[buttonId];
+    
+    // Send initial command
+    sendCommand({ type: 'mouseMove', dx, dy });
+    
+    // Set up interval for continuous movement
+    mouseInterval = setInterval(() => {
+      if (activeMouseButton) {
+        const { dx, dy } = mouseButtons[activeMouseButton];
+        sendCommand({ type: 'mouseMove', dx, dy });
+      }
+    }, 150); // Send command every 150ms for smooth movement
+  }
+  
+  function stopMouseMovement() {
+    if (mouseInterval) {
+      clearInterval(mouseInterval);
+      mouseInterval = null;
+    }
+    activeMouseButton = null;
+  }
+  
+  // Add event listeners for mouse movement buttons
+  Object.keys(mouseButtons).forEach(buttonId => {
+    const button = document.getElementById(buttonId);
+    
+    // Touch events for mobile
+    button.addEventListener('touchstart', (e) => {
+      e.preventDefault(); // Prevent default touch behavior
+      startMouseMovement(buttonId);
+    });
+    
+    button.addEventListener('touchend', () => {
+      stopMouseMovement();
+    });
+    
+    button.addEventListener('touchcancel', () => {
+      stopMouseMovement();
+    });
+    
+    // Mouse events for desktop
+    button.addEventListener('mousedown', () => {
+      startMouseMovement(buttonId);
+    });
+    
+    button.addEventListener('mouseup', () => {
+      stopMouseMovement();
+    });
+    
+    button.addEventListener('mouseleave', () => {
+      if (activeMouseButton === buttonId) {
+        stopMouseMovement();
+      }
+    });
+  });
+  
+  // Stop mouse movement when leaving the window
+  window.addEventListener('blur', stopMouseMovement);
+
+  // Mouse clicks with both touch and click support
+  function setupButtonHandler(id, commandFn) {
+    const button = document.getElementById(id);
+    
+    // Touch events for mobile
+    button.addEventListener('touchstart', (e) => {
+      e.preventDefault(); // Prevent default touch behavior
+      commandFn();
+    });
+    
+    // Mouse events for desktop
+    button.addEventListener('click', () => {
+      commandFn();
+    });
+  }
+  
+  // Set up click handlers
+  setupButtonHandler('left-click', () => {
+    sendCommand({ type: 'mouseClick', button: 'left' });
+  });
+  
+  setupButtonHandler('right-click', () => {
+    sendCommand({ type: 'mouseClick', button: 'right' });
+  });
+  
+  // Scroll with continuous scrolling
+  let scrollInterval = null;
+  
+  function startScrolling(direction) {
+    if (scrollInterval) {
+      clearInterval(scrollInterval);
+    }
+    
+    // Send initial scroll command
+    sendCommand({ type: 'scroll', dy: direction * SCROLL_STEP });
+    
+    // Set up interval for continuous scrolling
+    scrollInterval = setInterval(() => {
+      sendCommand({ type: 'scroll', dy: direction * SCROLL_STEP });
+    }, 200); // Scroll every 200ms
+  }
+  
+  function stopScrolling() {
+    if (scrollInterval) {
+      clearInterval(scrollInterval);
+      scrollInterval = null;
+    }
+  }
+  
+  // Set up scroll handlers
+  const scrollUpBtn = document.getElementById('scroll-up');
+  scrollUpBtn.addEventListener('touchstart', (e) => {
+    e.preventDefault();
+    startScrolling(1); // Positive direction (up)
+  });
+  scrollUpBtn.addEventListener('mousedown', () => {
+    startScrolling(1);
+  });
+  scrollUpBtn.addEventListener('touchend', stopScrolling);
+  scrollUpBtn.addEventListener('touchcancel', stopScrolling);
+  scrollUpBtn.addEventListener('mouseup', stopScrolling);
+  scrollUpBtn.addEventListener('mouseleave', stopScrolling);
+  
+  const scrollDownBtn = document.getElementById('scroll-down');
+  scrollDownBtn.addEventListener('touchstart', (e) => {
+    e.preventDefault();
+    startScrolling(-1); // Negative direction (down)
+  });
+  scrollDownBtn.addEventListener('mousedown', () => {
+    startScrolling(-1);
+  });
+  scrollDownBtn.addEventListener('touchend', stopScrolling);
+  scrollDownBtn.addEventListener('touchcancel', stopScrolling);
+  scrollDownBtn.addEventListener('mouseup', stopScrolling);
+  scrollDownBtn.addEventListener('mouseleave', stopScrolling);
+
+  // Keyboard input
+  const keyInput = document.getElementById('key-input');
+  const sendKeyBtn = document.getElementById('send-key');
+
+  function sendKey() {
+    const key = keyInput.value.trim().toLowerCase();
+    if (key) {
+      // Map some common keys
+      const keyMap = {
+        enter: 'enter',
+        space: 'space',
+        backspace: 'backspace',
+        tab: 'tab',
+        escape: 'escape',
+        esc: 'escape',
+        up: 'up',
+        down: 'down',
+        left: 'left',
+        right: 'right',
+        shift: 'shift',
+        ctrl: 'control',
+        control: 'control',
+        alt: 'alt',
+        delete: 'delete',
+        del: 'delete',
+        home: 'home',
+        end: 'end',
+        pageup: 'pageup',
+        pagedown: 'pagedown'
+      };
+      const sendKey = keyMap[key] || key;
+
+      sendCommand({ type: 'keyTap', key: sendKey });
+      keyInput.value = '';
+      keyInput.focus();
+    }
+  }
+
+  sendKeyBtn.addEventListener('click', sendKey);
+  keyInput.addEventListener('keyup', (e) => {
+    if (e.key === 'Enter') {
+      sendKey();
+    }
+  });
+
+  // Login button
+  loginBtn.addEventListener('click', () => {
+    const password = passwordInput.value.trim();
+    if (password) {
+      createWebSocket(password);
+      setStatus('Connecting...', '#4caf50');
+    }
+  });
+
+  passwordInput.addEventListener('keyup', (e) => {
+    if (e.key === 'Enter') {
+      loginBtn.click();
+    }
+  });
+})();
+</script>
+
+</body>
+</html>
+
